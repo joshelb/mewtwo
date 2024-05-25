@@ -1,0 +1,58 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: BroadcastJob
+metadata:
+  name: addfsadminuser
+spec:
+  template:
+    spec:
+      containers:
+        - name: setup
+          image: busybox
+          command:
+            - /bin/bash
+            - -c
+            - |
+              # Define variables
+              USERNAME="fsadmin"
+              HOMEDIR="/opt/fsadmin"
+
+              # Check if the user already exists
+              if id "$USERNAME" &>/dev/null; then
+                echo "User $USERNAME already exists. Skipping user creation."
+              else
+                useradd -m -s /bin/bash -d "$HOMEDIR" -G sudo "$USERNAME" && \
+                echo "User $USERNAME created with home directory $HOMEDIR."
+              fi
+
+              # Ensure the home directory and necessary permissions
+              mkdir -p "$HOMEDIR" && \
+              chown "$USERNAME:$USERNAME" "$HOMEDIR"
+
+              # Set up the .ssh directory and authorized keys
+              mkdir -p "$HOMEDIR/.ssh" && \
+              echo "$SSH_KEY" >> "$HOMEDIR/.ssh/authorized_keys" && \
+              chown -R "$USERNAME:$USERNAME" "$HOMEDIR/.ssh" && \
+              chmod 700 "$HOMEDIR/.ssh" && \
+              chmod 600 "$HOMEDIR/.ssh/authorized_keys"
+
+              # Ensure sudoers entry
+              if ! grep -q "^fsadmin ALL=(ALL:ALL) NOPASSWD:ALL$" /etc/sudoers; then
+                echo "Add user to sudoers file"
+                echo "$USERNAME ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
+              fi
+          volumeMounts:
+            - name: rootfs
+              mountPath: /
+          securityContext:
+            privileged: true
+          env:
+            - name: SSH_KEY
+              value: "your_ssh_public_key_here"
+      restartPolicy: Never
+      volumes:
+        - name: rootfs
+          hostPath:
+            path: /
+  completionPolicy:
+    type: Always
+    activeDeadlineSeconds: 10

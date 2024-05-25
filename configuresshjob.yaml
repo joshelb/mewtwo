@@ -1,0 +1,75 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: BroadcastJob
+metadata:
+  name: addfsadminuser
+spec:
+  template:
+    spec:
+      containers:
+        - name: setup
+          image: busybox
+          command:
+            - /bin/bash
+            - -c
+            - |
+              add_config_if_not_exists() {
+                  local config_line="$1"
+                  local config_file="$2"
+
+                  if ! grep -qF "$config_line" "$config_file"; then
+                      echo "$config_line" >> "$config_file"
+                  fi
+              }
+
+
+              # Configure KEX
+              add_config_if_not_exists 'kexalgorithms curve25519-sha256@libssh.org,curve25519-sha256,diffie-hellman-group18-sha512,diffie-hellman-group16-sha512' '/etc/ssh/sshd_config'
+
+              # Configure MAC
+              add_config_if_not_exists 'macs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,hmac-sha2-256,hmac-sha2-512' '/etc/ssh/sshd_config'
+
+              # Configure Ciphers
+              add_config_if_not_exists 'ciphers aes256-gcm@openssh.com,aes128-gcm@openssh.com' '/etc/ssh/sshd_config'
+
+              # Configure SyslogFacility
+              sed -i 's/#SyslogFacility AUTH/SyslogFacility AUTH/' /etc/ssh/sshd_config
+
+              # Configure LogLevel
+              sed -i 's/#LogLevel INFO/LogLevel INFO/' /etc/ssh/sshd_config
+
+              # Configure StrictModes
+              sed -i 's/#StrictModes yes/StrictModes yes/' /etc/ssh/sshd_config
+
+              # Configure MaxAuthTries
+              sed -i 's/#MaxAuthTries 6/MaxAuthTries 5/' /etc/ssh/sshd_config
+
+              # Configure MaxSessions
+              sed -i 's/#MaxSessions 10/MaxSessions 10/' /etc/ssh/sshd_config
+
+              # Configure X11Forwarding
+              sed -i 's/X11Forwarding yes/X11Forwarding no/' /etc/ssh/sshd_config
+
+              # Configure UseDNS
+              sed -i 's/#UseDNS no/UseDNS no/' /etc/ssh/sshd_config
+
+              # Configure PermitTunnel
+              sed -i 's/#PermitTunnel no/PermitTunnel yes/' /etc/ssh/sshd_config
+
+              # Remove NIST server host key
+              rm -f /etc/ssh/ssh_host_ecdsa_key.pub
+
+              # Remove NIST server host key
+              rm -f /etc/ssh/ssh_host_ecdsa_key
+          volumeMounts:
+            - name: rootfs
+              mountPath: /
+          securityContext:
+            privileged: true
+      restartPolicy: Never
+      volumes:
+        - name: rootfs
+          hostPath:
+            path: /
+  completionPolicy:
+    type: Always
+    activeDeadlineSeconds: 10

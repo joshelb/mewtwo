@@ -1,0 +1,101 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: BroadcastJob
+metadata:
+  name: addfsadminuser
+spec:
+  template:
+    spec:
+      hostnetwork: true
+      containers:
+        - name: setup
+          image: busybox
+          command:
+            - /bin/bash
+            - -c
+            - |
+              sysctl_params=(
+                "net.ipv4.tcp_fin_timeout=10"
+                "net.ipv4.tcp_keepalive_time=600"
+                "net.ipv4.tcp_keepalive_intvl=15"
+                "net.ipv4.tcp_keepalive_probes=5"
+                "net.core.somaxconn=256000"
+                "net.ipv4.tcp_syncookies=1"
+                "net.ipv4.tcp_syn_retries=2"
+                "net.ipv4.tcp_synack_retries=2"
+                "net.ipv4.tcp_orphan_retries=2"
+                "net.ipv4.tcp_max_syn_backlog=40000"
+                "net.core.netdev_max_backlog=250000"
+                "net.ipv4.tcp_congestion_control=yeah"
+                "net.ipv4.ip_local_port_range=10000 59999"
+                "net.ipv4.neigh.default.gc_thresh1=1024"
+                "net.ipv4.neigh.default.gc_thresh2=2048"
+                "net.ipv4.neigh.default.gc_thresh3=4096"
+                "net.ipv4.tcp_challenge_ack_limit=9999"
+                "net.ipv4.tcp_slow_start_after_idle=0"
+                "net.ipv4.tcp_low_latency=1"
+                "net.ipv4.tcp_max_tw_buckets=2000000"
+                "net.ipv4.tcp_wmem=4096 65536 16777216"
+                "net.ipv4.tcp_rmem=4096 87380 16777216"
+                "net.core.rmem_max=16777216"
+                "net.core.rmem_default=16777216"
+                "net.core.wmem_max=16777216"
+                "net.core.wmem_default=16777216"
+                "net.core.optmem_max=65536"
+                "net.ipv4.udp_rmem_min=8192"
+                "net.ipv4.udp_wmem_min=8192"
+                "net.unix.max_dgram_qlen=1024"
+                "vm.swappiness=2"
+                "vm.vfs_cache_pressure=500"
+                "vm.dirty_writeback_centisecs=3000"
+                "vm.dirty_background_ratio=5"
+                "vm.dirty_ratio=10"
+                "fs.inotify.max_user_instances=16777216"
+                "fs.inotify.max_queued_events=32000"
+                "fs.inotify.max_user_watches=64000"
+                "net.ipv4.ipfrag_high_thresh=8388608"
+                "net.ipv4.ipfrag_low_thresh=196608"
+                "net.ipv6.ip6frag_high_thresh=8388608"
+                "net.ipv6.ip6frag_low_thresh=196608"
+                "net.ipv4.tcp_sack=1"
+                "net.ipv4.tcp_mtu_probing=0"
+                "net.ipv4.tcp_rfc1337=1"
+                "dev.tty.ldisc_autoload=0"
+                "fs.protected_fifos=2"
+                "fs.suid_dumpable=0"
+                "kernel.unprivileged_bpf_disabled=1"
+                "net.ipv4.conf.all.log_martians=1"
+                "net.ipv4.conf.default.log_martians=1"
+                "net.ipv4.tcp_timestamps=0"
+                "net.ipv4.tcp_adv_win_scale=1"
+              )
+
+              # Iterate over each parameter and ensure it is set in /etc/sysctl.conf
+              for param in "${sysctl_params[@]}"; do
+                  key="${param%%=*}"
+                  value="${param#*=}"
+
+                  # Check if the parameter is already in the file
+                  if grep -q "^${key}=" /etc/sysctl.conf; then
+                      # If it exists, replace the line
+                      sed -i "s|^${key}=.*|${key}=${value}|" /etc/sysctl.conf
+                  else
+                      # If it does not exist, append the line
+                      echo "${param}" >> /etc/sysctl.conf
+                  fi
+              done
+
+              # Apply the sysctl settings
+              sysctl -p
+          volumeMounts:
+            - name: rootfs
+              mountPath: /
+          securityContext:
+            privileged: true
+      restartPolicy: Never
+      volumes:
+        - name: rootfs
+          hostPath:
+            path: /
+  completionPolicy:
+    type: Always
+    activeDeadlineSeconds: 10
