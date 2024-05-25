@@ -1,0 +1,96 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: BroadcastJob
+metadata:
+  name: addfsadminuser
+spec:
+  template:
+    spec:
+      containers:
+        - name: setup
+          image: busybox
+          command:
+            - /bin/bash
+            - -c
+            - |           
+              # Function to add configuration if it doesn't exist or replace it if it does
+              add_or_replace_config() {
+                  local config_line="$1"
+                  local config_file="$2"
+                  local key="$3"
+
+                  if grep -q "^${key}" "$config_file"; then
+                      # If the key exists, replace the line
+                      sed -i "s|^${key}.*|${config_line}|" "$config_file"
+                  else
+                      # If the key does not exist, append the line
+                      echo "$config_line" >> "$config_file"
+                  fi
+              }
+
+              # Harden /etc/profile
+              add_or_replace_config 'ulimit -c 0' '/etc/profile' 'ulimit'
+              add_or_replace_config 'umask 027' '/etc/profile' 'umask'
+              add_or_replace_config 'HISTTIMEFORMAT="%F %T "' '/etc/profile' 'HISTTIMEFORMAT'
+              add_or_replace_config 'export HISTTIMEFORMAT' '/etc/profile' 'export HISTTIMEFORMAT'
+              add_or_replace_config 'readonly HISTTIMEFORMAT' '/etc/profile' 'readonly HISTTIMEFORMAT'
+              add_or_replace_config 'HISTSIZE=2000' '/etc/profile' 'HISTSIZE'
+              add_or_replace_config 'export HISTSIZE' '/etc/profile' 'export HISTSIZE'
+              add_or_replace_config 'readonly HISTSIZE' '/etc/profile' 'readonly HISTSIZE'
+
+              # Harden /etc/login.defs
+              sed -i 's/^UMASK\s\+.*$/UMASK        027/' /etc/login.defs
+              sed -i 's/^PASS_MAX_DAYS\s\+.*$/PASS_MAX_DAYS        735/' /etc/login.defs
+              sed -i 's/^# SHA_CRYPT_MIN_ROUNDS\s\+.*$/SHA_CRYPT_MIN_ROUNDS 6000/' /etc/login.defs
+              sed -i 's/^# SHA_CRYPT_MAX_ROUNDS\s\+.*$/SHA_CRYPT_MAX_ROUNDS 9999/' /etc/login.defs
+
+              # Disable USB storage
+              add_or_replace_config 'blacklist usb-storage' '/etc/modprobe.d/blacklist.conf' 'blacklist usb-storage'
+
+              # Disable core dumps
+              add_or_replace_config '* hard core 0' '/etc/security/limits.conf' '* hard core 0'
+              add_or_replace_config '* soft core 0' '/etc/security/limits.conf' '* soft core 0'
+              add_or_replace_config 'ProcessSizeMax=0' '/etc/systemd/coredump.conf' 'ProcessSizeMax'
+              add_or_replace_config 'Storage=none' '/etc/systemd/coredump.conf' 'Storage'
+
+              # Change file permissions
+              chmod 0600 /boot/grub/grub.cfg
+              chmod 0600 /etc/crontab
+              chmod 0600 /etc/ssh/sshd_config
+              chmod 0700 /etc/cron.d
+              chmod 0700 /etc/cron.daily
+              chmod 0700 /etc/cron.hourly
+              chmod 0700 /etc/cron.weekly
+              chmod 0700 /etc/cron.monthly
+
+              # Install apt packages
+              apt update
+              apt install -y chkrootkit apt-show-versions debsums sysstat
+
+              # Enable sysstat
+              sed -i 's/ENABLED="false"/ENABLED="true"/' /etc/default/sysstat
+
+
+              echo "Clean apt cache"
+              apt clean
+
+              # Example usage of updating or appending sysctl parameters
+              add_or_replace_config "net.ipv4.ip_forward=1" "/etc/sysctl.conf" "net.ipv4.ip_forward"
+              add_or_replace_config "net.ipv4.conf.all.accept_redirects=0" "/etc/sysctl.conf" "net.ipv4.conf.all.accept_redirects"
+
+              echo "Hardening complete."
+          volumeMounts:
+            - name: rootfs
+              mountPath: /
+          securityContext:
+            privileged: true
+          env:
+            - name: SSH_KEY
+              value: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP186kkvOG2wJRvBPX2JBGgdcKqAXIaNXhz0BysdGDz6 joshuademian@MacBook-Pro.fritz.box"
+      restartPolicy: Never
+      volumes:
+        - name: rootfs
+          hostPath:
+            path: /
+  completionPolicy:
+    type: Always
+    activeDeadlineSeconds: 10
