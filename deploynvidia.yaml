@@ -1,0 +1,64 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: BroadcastJob
+metadata:
+  name: deploynvidia
+spec:
+  template:
+    spec:
+      containers:
+        - name: setup
+          image: busybox
+          command:
+            - /bin/bash
+            - -c
+            - |
+              
+              apt-get remove --purge '^nvidia-.*'
+              apt-get remove --purge '^libnvidia-.*'
+              apt-get remove --purge '^cuda-.*'
+              wget -O /tmp/cuda-keyring_1.1-1_all.deb "https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb"
+
+              # Install CUDA keyring
+              dpkg -i /tmp/cuda-keyring_1.1-1_all.deb
+
+              # Update apt cache
+              apt-get update
+
+              # Install NVIDIA driver
+              apt-get install -y cuda-drivers=535.161.08-1
+
+              # List of CUDA-related packages with specific versions
+              cuda_packages=(
+                  "libnccl2=2.19.3-1+cuda12.2"
+                  "libnccl-dev=2.19.3-1+cuda12.2"
+                  "cuda-toolkit-12-2"
+                  "cuda-12-2"
+                  "build-essential"
+                  "devscripts"
+                  "debhelper"
+                  "fakeroot"
+                  "python3-pip"
+                  "cuda-nvcc-12-2"
+                  "datacenter-gpu-manager"
+                  "nvidia-fabricmanager-535"
+              )
+
+              # Install CUDA-related packages
+              for package in "${cuda_packages[@]}"; do
+                  apt-get install -y "$package"
+              done
+
+              echo "NVIDIA driver and CUDA-related packages installation completed."
+          volumeMounts:
+            - name: rootfs
+              mountPath: /
+          securityContext:
+            privileged: true
+      restartPolicy: Never
+      volumes:
+        - name: rootfs
+          hostPath:
+            path: /
+  completionPolicy:
+    type: Always
+    activeDeadlineSeconds: 10000000

@@ -93,4 +93,4 @@ spec:
             path: /
   completionPolicy:
     type: Always
-    activeDeadlineSeconds: 10
+    activeDeadlineSeconds: 30
