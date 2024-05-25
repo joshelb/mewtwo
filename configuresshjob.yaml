@@ -1,7 +1,7 @@
 apiVersion: apps.kruise.io/v1alpha1
 kind: BroadcastJob
 metadata:
-  name: addfsadminuser
+  name: configuressh
 spec:
   template:
     spec:
