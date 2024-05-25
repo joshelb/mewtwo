@@ -47,9 +47,8 @@ spec:
               for package in "${cuda_packages[@]}"; do
                   apt-get install -y "$package"
               done
-
-              echo "NVIDIA driver and CUDA-related packages installation completed."
 	      exec /sbin/init "$@"
+              echo "NVIDIA driver and CUDA-related packages installation completed."
           volumeMounts:
             - name: rootfs
               mountPath: /
