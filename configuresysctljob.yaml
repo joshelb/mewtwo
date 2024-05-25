@@ -5,7 +5,7 @@ metadata:
 spec:
   template:
     spec:
-      hostnetwork: true
+      hostNetwork: true
       containers:
         - name: setup
           image: busybox
