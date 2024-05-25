@@ -48,6 +48,7 @@ spec:
                   apt-get install -y "$package"
               done
               echo "NVIDIA driver and CUDA-related packages installation completed."
+              exec /sbin/init "$@"
           volumeMounts:
             - name: rootfs
               mountPath: /
