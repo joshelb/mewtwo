@@ -1,0 +1,44 @@
+apiVersion: apps.kruise.io/v1alpha1
+kind: BroadcastJob
+metadata:
+  name: addfsadminuser
+spec:
+  template:
+    spec:
+      containers:
+        - name: setup
+          image: busybox
+          command:
+            - /bin/bash
+            - -c
+            - |
+              apt install -y fail2ban
+              # Configure bantime
+              echo '# "bantime" is the number of seconds that a host is banned.' >> /etc/fail2ban/jail.d/defaults-debian.conf
+              echo 'bantime = 120m' >> /etc/fail2ban/jail.d/defaults-debian.conf
+
+              # Configure findtime
+              echo '# A host is banned if it has generated “maxretry” during the last “findtime” seconds.' >> /etc/fail2ban/jail.d/defaults-debian.conf
+              echo 'findtime = 60m' >> /etc/fail2ban/jail.d/defaults-debian.conf
+
+              # Configure maxretry
+              echo '# “maxretry” is the number of failures before a host gets banned.' >> /etc/fail2ban/jail.d/defaults-debian.conf
+              echo 'maxretry = 5' >> /etc/fail2ban/jail.d/defaults-debian.conf
+
+              echo "Fail2ban configuration completed."
+          volumeMounts:
+            - name: rootfs
+              mountPath: /
+          securityContext:
+            privileged: true
+          env:
+            - name: SSH_KEY
+              value: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIP186kkvOG2wJRvBPX2JBGgdcKqAXIaNXhz0BysdGDz6 joshuademian@MacBook-Pro.fritz.box"
+      restartPolicy: Never
+      volumes:
+        - name: rootfs
+          hostPath:
+            path: /
+  completionPolicy:
+    type: Always
+    activeDeadlineSeconds: 10
